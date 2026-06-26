@@ -1,5 +1,6 @@
+from dcim.models import Device, Interface
 from netbox.plugins import PluginTemplateExtension
-from .models import McDomain, McLag
+
 from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 
 
@@ -7,7 +8,10 @@ class McLagInterfaceExtensions(PluginTemplateExtension):
     model = "dcim.interface"
 
     def buttons(self):
-        interface = self.context["object"]
+        interface = self.context.get("object")
+
+        if not isinstance(interface, Interface):
+            return ""
 
         if interface.type != "lag":
             interface = interface.lag
@@ -36,7 +40,10 @@ class McLagDeviceExtensions(PluginTemplateExtension):
     model = "dcim.device"
 
     def buttons(self):
-        device = self.context["object"]
+        device = self.context.get("object")
+
+        if not isinstance(device, Device):
+            return ""
 
         try:
             mc_domain = device.mc_domains.get()
