@@ -1,9 +1,10 @@
 from rest_framework import serializers
 
 from netbox.api.serializers import NetBoxModelSerializer, WritableNestedSerializer
+from netbox.api.fields import SerializedPKRelatedField
 from dcim.api.serializers import DeviceSerializer, InterfaceSerializer
 from ..models import McLag, McDomain
-from dcim.models import Interface
+from dcim.models import Device, Interface
 from ..util import get_interface_label
 
 #
@@ -14,7 +15,7 @@ class NestedMcDomainSerializer(WritableNestedSerializer):
     url = serializers.HyperlinkedIdentityField(
         view_name='plugins-api:netbox_plugin_mclag-api:mcdomain-detail'
     )
-    devices = DeviceSerializer(nested=True, many=True)
+    devices = DeviceSerializer(nested=True, many=True, read_only=True)
 
     class Meta:
         model = McDomain
@@ -25,7 +26,7 @@ class NestedMcLagSerializer(WritableNestedSerializer):
     url = serializers.HyperlinkedIdentityField(
         view_name='plugins-api:netbox_plugin_mclag-api:mclag-detail'
     )
-    interfaces = InterfaceSerializer(nested=True, many=True)
+    interfaces = InterfaceSerializer(nested=True, many=True, read_only=True)
 
     class Meta:
         model = McLag
@@ -39,8 +40,13 @@ class McDomainSerializer(NetBoxModelSerializer):
     url = serializers.HyperlinkedIdentityField(
         view_name='plugins-api:netbox_plugin_mclag-api:mcdomain-detail'
     )
-    mc_lags = NestedMcLagSerializer(many=True)
-    devices = DeviceSerializer(nested=True, many=True)
+    mc_lags = NestedMcLagSerializer(many=True, read_only=True)
+    devices = SerializedPKRelatedField(
+        queryset=Device.objects.all(),
+        serializer=DeviceSerializer,
+        nested=True,
+        many=True,
+    )
 
     class Meta:
         model = McDomain
@@ -55,7 +61,12 @@ class McLagSerializer(NetBoxModelSerializer):
         view_name='plugins-api:netbox_plugin_mclag-api:mclag-detail'
     )
     mc_domain = NestedMcDomainSerializer()
-    interfaces = InterfaceSerializer(nested=True, many=True)
+    interfaces = SerializedPKRelatedField(
+        queryset=Interface.objects.all(),
+        serializer=InterfaceSerializer,
+        nested=True,
+        many=True,
+    )
 
     class Meta:
         model = McLag
