@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Test NetBox ${{ matrix.netbox }}
+    strategy:
+      fail-fast: false
+      matrix:
+        netbox: [v4.6.3, v4.7.3-5.1.1]
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: netbox
+          POSTGRES_USER: netbox
+          POSTGRES_PASSWORD: netbox
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U netbox -d netbox"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: valkey/valkey:9.1-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Write test configuration
+        run: |
+          cat > "${RUNNER_TEMP}/configuration.py" <<'PY'
+          ALLOWED_HOSTS = ['*']
+          SECRET_KEY = 'ci-only-not-for-production-secret-key-ci-only-not-for-production'
+          API_TOKEN_PEPPERS = {1: 'ci-only-not-for-production-pepper-ci-only-not-for-production'}
+          DATABASE = {'NAME': 'netbox', 'USER': 'netbox', 'PASSWORD': 'netbox', 'HOST': '127.0.0.1', 'PORT': 5432}
+          REDIS = {
+              'tasks': {'HOST': '127.0.0.1', 'PORT': 6379, 'DATABASE': 0, 'SSL': False},
+              'caching': {'HOST': '127.0.0.1', 'PORT': 6379, 'DATABASE': 1, 'SSL': False},
+          }
+          PLUGINS = ['netbox_plugin_mclag']
+          PY
+      - name: Check migrations and API relationships
+        env:
+          NETBOX_IMAGE: netboxcommunity/netbox:${{ matrix.netbox }}
+        run: |
+          docker run --rm --network host --user root \
+            -v "${PWD}:/plugin" \
+            -v "${RUNNER_TEMP}/configuration.py:/opt/netbox/netbox/netbox/configuration.py:ro" \
+            --entrypoint /bin/bash "${NETBOX_IMAGE}" -lc '
+              set -euo pipefail
+              source /opt/netbox/venv/bin/activate
+              uv pip install /plugin
+              cd /opt/netbox/netbox
+              python manage.py check
+              python manage.py makemigrations netbox_plugin_mclag --check --dry-run
+              python manage.py test netbox_plugin_mclag.tests --noinput -v 2
+            '

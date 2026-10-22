@@ -85,9 +85,21 @@ exit
 
 ## Supported versions
 
-The current version of the  `netbox-plugin-mclag` plugin has been developed for Netbox 4.2. and is not supported on older versions.
+Version `0.2.3` supports NetBox 4.6 and 4.7 with the Python version supplied by
+NetBox. CI tests NetBox `v4.6.3` and `v4.7.3-5.1.1`.
 
-The plugin has been developed for Python 3.12.3, but I expect it to work with any Python version supported by Netbox.
+The REST API accepts device IDs in a domain's `devices` list, interface IDs in
+a LAG's `interfaces` list, and a domain ID in `mc_domain`. Reads retain nested
+object representations; the reverse `mc_lags` collection is read-only.
+
+Run the relationship regression suite in a configured NetBox environment:
+
+```sh
+python manage.py test netbox_plugin_mclag.tests --noinput
+```
+
+The suite covers create/update/read/delete relationship persistence and rejects
+invalid members without creating a partial domain.
 
 ## Installation
 
